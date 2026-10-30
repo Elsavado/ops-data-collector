@@ -1,7 +1,6 @@
 """Books & knowledge library: open-access books, NIST guides, Wikipedia topic articles, OWASP, CWE/CAPEC."""
 import datetime as dt
 import html
-import json
 import re
 import time
 
@@ -110,24 +109,23 @@ def open_books(sink, st, per_topic=8):
             time.sleep(1)
             fname = f"{title} ({w.get('publication_year')})"
             if _download(s, pdf, 300 * 2 ** 20, sink, f"{dest}/{fname}.pdf"):
-                sink.write_text(f"{dest}/{fname}.json", json.dumps({
+                meta_note(sink, f"{dest}/{fname}", {
                     "title": w.get("title"), "doi": w.get("doi"), "year": w.get("publication_year"),
                     "authors": [a["author"]["display_name"] for a in w.get("authorships", [])][:20],
                     "publisher": ((loc.get("source") or {}).get("display_name")), "license": lic,
-                    "pdf": pdf, "found_via": "OpenAlex", "retrieved": dt.date.today().isoformat()},
-                    indent=1, ensure_ascii=False))
+                    "pdf": pdf, "found_via": "OpenAlex"})
                 took += 1
                 n += 1
     return n
 
 
-def _wiki_doc(title, html_text, url):
+def _wiki_doc(title, html_text, url, credit="Wikipedia contributors, CC BY-SA 4.0"):
     d = Document()
     d.styles["Normal"].font.size = Pt(10.5)
     d.core_properties.title = title
-    d.core_properties.comments = f"Wikipedia article {url} - CC BY-SA 4.0"
+    d.core_properties.comments = f"{url} - {credit}"
     d.add_heading(title, 0)
-    d.add_paragraph(f"Source: {url} (Wikipedia contributors, CC BY-SA 4.0). Retrieved {dt.date.today()}.")
+    d.add_paragraph(f"Source: {url} ({credit}). Retrieved {dt.date.today()}.")
     body = re.sub(r"(?s)<(style|script|table|figure|sup)[^>]*>.*?</\1>", "", html_text)
     for tag, inner in re.findall(r"(?s)<(h2|h3|h4|p|li)[^>]*>(.*?)</\1>", body):
         text = html.unescape(re.sub(r"<[^>]+>", "", inner)).strip()

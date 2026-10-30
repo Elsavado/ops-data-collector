@@ -6,18 +6,18 @@ marinas and residential/retail clients. Files go straight from the runner to Goo
 
 ## What it collects
 
-**Public Data** (openly licensed, with a `_source.json` next to each item)
+**Public Data** (openly licensed; each folder's source and licence are recorded in `_state`), sorted by topic and subtopic
 
 | Folder | Sources |
 |---|---|
-| 1 Threat Intelligence | CISA KEV, NVD CVE records per month, MITRE ATT&CK, Zenodo and government open-data portal (Socrata) datasets |
+| 1 Threat Intelligence | CISA KEV, CSE-CIC-IDS2018 network flows (6.4 GB), NVD CVE records per month, MITRE ATT&CK, Zenodo and government open-data portal (Socrata) datasets |
 | 2 Standards & Compliance | NIST SP 800-53 Rev 5 (XLSX + DOCX per family), datasets |
 | 3 IT Service Management | UCI ITSM incident event log, datasets |
 | 4 Physical Security & Surveillance | Zenodo + open-data portal datasets |
 | 5 Hospitality & Maritime Operations | Hotel booking demand, datasets |
 | 6 Cloud & Infrastructure Operations | Loghub system logs (16 systems, 5.6 GB), Zenodo + open-data portal datasets |
 | 7 Workforce & Business Benchmarks | Zenodo + open-data portal datasets |
-| 9 IT & Developer Tools | product release/end-of-life dates (endoflife.date), Stack Exchange archives (Server Fault, Super User, Security, Ask Ubuntu, Unix, DBA, DevOps…), Kubernetes/Docker/Ansible/Prometheus/Windows Server/PowerShell/PostgreSQL docs, Pro Git, tldr, curated tool catalogues, companies by technology stack (Leadita), Kaggle datasets |
+| 9 IT & Developer Tools | product release/end-of-life dates (endoflife.date), Stack Exchange archives (Server Fault, Super User, Security, Ask Ubuntu, Unix, DBA, DevOps…), Kubernetes/Docker/Ansible/Prometheus/Windows Server/PowerShell/PostgreSQL docs, Pro Git, tldr, curated tool catalogues, IT documentation & runbooks (GitHub topic it-documentation, Microsoft Engineering Playbook, Gruntwork Runbooks, onboarding templates), companies by technology stack (Leadita), Kaggle datasets |
 | 8 Books & Knowledge Library | NIST security publications, open-access books (OpenAlex, CC/public domain), Wikipedia topic articles as DOCX, OWASP, CWE, CAPEC, D3FEND, Sigma, Atomic Red Team |
 
 **Fictional Company - Harborlight Secure Systems** (synthetic, made-up names, `.example` domains):

@@ -11,7 +11,7 @@ on:
     inputs:
       public_sources:
         description: "public sources (comma list, empty = skip)"
-        default: "kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,eol,techdocs,wikipedia,books,stackexchange,kaggle,zenodo,opendata"
+        default: "kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,cicids2018,itdocs,eol,techdocs,wikipedia,books,stackexchange,kaggle,zenodo,opendata"
       company:
         description: "build the fictional company"
         type: boolean
@@ -57,9 +57,10 @@ jobs:
         env:
           LIVE: ${{ vars.LIVE == 'true' && inputs.dry_run != true }}
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-          SOURCES: ${{ inputs.public_sources || 'kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,eol,techdocs,wikipedia,books,stackexchange,kaggle,zenodo,opendata' }}
+          SOURCES: ${{ inputs.public_sources || 'kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,cicids2018,itdocs,eol,techdocs,wikipedia,books,stackexchange,kaggle,zenodo,opendata' }}
         run: |
           budget=$(cat budget.txt)
           flag=$([ "$LIVE" = "true" ] && echo --live || echo "")

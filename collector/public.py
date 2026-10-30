@@ -1,9 +1,7 @@
 """Openly licensed public data that a security / IT-services operator works with."""
 import datetime as dt
-import gzip
 import hashlib
 import io
-import json
 import os
 import re
 import time
@@ -53,8 +51,68 @@ def title_query(q):
 
 
 def meta_note(sink, folder, info):
-    info = dict(info, retrieved=dt.date.today().isoformat())
-    sink.write_text(f"{folder}/_source.json", json.dumps(info, indent=1, ensure_ascii=False))
+    """Record where a folder's data came from (licence, URL) in the run state, not as a file beside it."""
+    sink.state.data.setdefault("catalog", {})[folder] = dict(info, retrieved=dt.date.today().isoformat())
+
+# Search term -> subtopic folder (first match wins, so specific keys come first)
+SUBTOPICS = [
+    ("intrusion video", "Video Analytics"), ("anomaly detection video", "Video Analytics"),
+    ("person detection", "Video Analytics"), ("weapon", "Video Analytics"), ("face mask", "Video Analytics"),
+    ("crowd", "Video Analytics"), ("license plate", "Video Analytics"),
+    ("software vulnerab", "Vulnerabilities"), ("intrusion", "Intrusion Detection"),
+    ("network traffic", "Network Traffic"), ("botnet", "Botnets & DDoS"), ("ddos", "Botnets & DDoS"),
+    ("phishing", "Phishing & Fraud"), ("fraud", "Phishing & Fraud"), ("malware", "Malware & Ransomware"),
+    ("ransomware", "Malware & Ransomware"), ("honeypot", "Honeypots"), ("vulnerab", "Vulnerabilities"),
+    ("cve", "Vulnerabilities"), ("threat intelligence", "Threat Intelligence Feeds"),
+    ("cyber threat", "Threat Intelligence Feeds"), ("security operations", "SOC Alerts & SIEM"),
+    ("siem", "SOC Alerts & SIEM"), ("security logs", "SOC Alerts & SIEM"), ("insider", "Insider Threat"),
+    ("breach", "Data Breaches"), ("privacy", "Privacy & Data Protection"), ("gdpr", "Privacy & Data Protection"),
+    ("cyber", "Cyber Incidents"), ("compliance", "Compliance & Audit"), ("audit", "Compliance & Audit"),
+    ("risk", "Risk Management"), ("policy", "Security Policy"), ("information security", "Security Policy"),
+    ("311", "Service Requests (311)"), ("service requests", "Service Requests (311)"),
+    ("event log", "Process Event Logs"), ("service management", "Incident & Service Tickets"),
+    ("help desk", "Incident & Service Tickets"), ("helpdesk", "Incident & Service Tickets"),
+    ("service desk", "Incident & Service Tickets"), ("tickets", "Incident & Service Tickets"),
+    ("servicenow", "Incident & Service Tickets"), ("itsm", "Incident & Service Tickets"),
+    ("work orders", "Maintenance & Work Orders"), ("maintenance", "Maintenance & Work Orders"),
+    ("asset", "IT Asset Management"), ("surveillance", "Video Surveillance"), ("cctv", "Video Surveillance"),
+    ("camera", "Video Surveillance"), ("access control", "Access Control"), ("security guard", "Guarding & Patrol"),
+    ("alarm", "Alarms & Fire Safety"), ("fire", "Alarms & Fire Safety"), ("smoke", "Alarms & Fire Safety"),
+    ("crime", "Crime & Calls for Service"), ("calls for service", "Crime & Calls for Service"),
+    ("burglary", "Crime & Calls for Service"), ("dispatch", "Crime & Calls for Service"),
+    ("security incidents", "Crime & Calls for Service"), ("hotel", "Hotels & Lodging"),
+    ("lodging", "Hotels & Lodging"), ("short term rental", "Hotels & Lodging"), ("airbnb", "Hotels & Lodging"),
+    ("hospitality", "Hotels & Lodging"), ("restaurant", "Hotels & Lodging"), ("cruise", "Cruise & Vessels"),
+    ("vessel", "Cruise & Vessels"), ("ais", "Cruise & Vessels"), ("ship", "Cruise & Vessels"),
+    ("port", "Ports & Marinas"), ("marina", "Ports & Marinas"), ("tourism", "Tourism"), ("visitor", "Tourism"),
+    ("server logs", "System & Server Logs"), ("system log", "System & Server Logs"),
+    ("log anomaly", "System & Server Logs"), ("web server", "System & Server Logs"),
+    ("cloud", "Cloud Workloads & Costs"), ("kubernetes", "Cloud Workloads & Costs"),
+    ("cpu", "Infrastructure Metrics"), ("telemetry", "Infrastructure Metrics"), ("iot", "Infrastructure Metrics"),
+    ("data center", "Data Centers"), ("network", "Network Monitoring & Outages"),
+    ("outage", "Network Monitoring & Outages"), ("uptime", "Network Monitoring & Outages"),
+    ("latency", "Network Monitoring & Outages"), ("broadband", "Network Monitoring & Outages"),
+    ("internet", "Network Monitoring & Outages"), ("salar", "Salaries & Payroll"), ("wages", "Salaries & Payroll"),
+    ("payroll", "Salaries & Payroll"), ("technician", "Salaries & Payroll"), ("layoffs", "Workforce"),
+    ("attrition", "Workforce"), ("hr analytics", "Workforce"), ("occupational", "Workforce"),
+    ("security companies", "Security Industry"), ("security services", "Security Industry"),
+    ("contracts", "Contracts & Procurement"), ("procurement", "Contracts & Procurement"),
+    ("purchase orders", "Contracts & Procurement"), ("vendor", "Contracts & Procurement"),
+    ("expenditures", "Spending"), ("spending", "Spending"), ("facility", "Facility Management"),
+    ("saas", "Sales & Customers"), ("crm", "Sales & Customers"), ("churn", "Sales & Customers"),
+    ("b2b", "Sales & Customers"), ("invoices", "Accounting"), ("accounting", "Accounting"),
+    ("stack overflow", "Developer Surveys"), ("developer survey", "Developer Surveys"),
+    ("github", "Open Source & Repositories"), ("open source", "Open Source & Repositories"),
+    ("software projects", "Open Source & Repositories"), ("programming", "Programming Languages"),
+    ("bugs", "Software Quality"), ("app reviews", "Software Quality"), ("devops", "DevOps & Containers"),
+    ("docker", "DevOps & Containers"), ("linux", "Operating Systems"), ("tech stack", "APIs & Tech Stacks"),
+    ("api", "APIs & Tech Stacks"),
+]
+
+
+def subtopic(q):
+    ql = q.lower()
+    return next((name for key, name in SUBTOPICS if key in ql), q.title())
 
 
 # ---------- fixed sources ----------
@@ -82,8 +140,6 @@ def kev(sink, st):
     add_sheet(wb, "Added per month", ["Month", "Count"], sorted(by.items()))
     base = f"{TI}/CISA Known Exploited Vulnerabilities"
     save_book(sink, f"{base}/KEV catalog {d.get('dateReleased', '')[:10]}.xlsx", wb)
-    sink.write_bytes(f"{base}/json/KEV catalog {d.get('dateReleased', '')[:10]}.json.gz",
-                     gzip.compress(r.content))
     meta_note(sink, base, {"source": "CISA Known Exploited Vulnerabilities Catalog",
                            "url": "https://www.cisa.gov/known-exploited-vulnerabilities-catalog",
                            "license": "US Government work, public domain"})
@@ -218,7 +274,6 @@ def attack(sink, st):
         add_sheet(wb, "Relationships", ["Source ID", "Source", "Relationship", "Target ID", "Target"], rel)
         base = f"{TI}/MITRE ATT&CK"
         save_book(sink, f"{base}/{dom} {dt.date.today()}.xlsx", wb)
-        sink.write_bytes(f"{base}/stix/{dom} {dt.date.today()}.json.gz", gzip.compress(r.content))
         st[f"attack_{dom}"] = h
         n += len(tech)
     if n:
@@ -381,7 +436,7 @@ def zenodo(sink, st, per_query=6, cap=2 * 2 ** 30):
                          and f.get("size", 0) <= cap]
                 if not files:
                     continue
-                dest = f"{folder}/Zenodo/{safe(md.get('title', rid), 90)} [{rid}]"
+                dest = f"{folder}/{subtopic(q)}/{safe(md.get('title', rid), 90)}"
                 got = 0
                 for f in files[:12]:
                     time.sleep(1)
@@ -455,7 +510,7 @@ def opendata(sink, st, per_query=5, cap=1 * 2 ** 30):
                     continue
                 seen.append(key)
                 seen_set.add(key)
-                dest = f"{folder}/Open Data Portals/{safe(name, 80)} ({md['domain']})"
+                dest = f"{folder}/{subtopic(q)}/{safe(name, 80)} ({md['domain']})"
                 url = f"https://{md['domain']}/api/views/{rs['id']}/rows.csv?accessType=DOWNLOAD"
                 if _download(s, url, cap, sink, f"{dest}/{safe(name, 80)}.csv"):
                     meta_note(sink, dest, {"source": "Socrata open-data portal", "portal": md["domain"],

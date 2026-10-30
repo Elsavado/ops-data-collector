@@ -4,7 +4,7 @@ import os
 import time
 
 from .common import get, safe, session
-from .public import BIZ, CLOUD, HOSP, ITSM, PHYS, STD, TI, _download, meta_note
+from .public import BIZ, CLOUD, HOSP, ITSM, PHYS, STD, TI, _download, meta_note, subtopic
 from .techdocs import TECH
 
 SEARCHES = {
@@ -71,7 +71,7 @@ def kaggle(sink, st, per_query=3, cap=3 * 2 ** 30):
                     continue
                 seen.append(ref)
                 seen_set.add(ref)
-                dest = f"{folder}/Kaggle/{safe(d.get('title') or ref, 80)}"
+                dest = f"{folder}/{subtopic(q)}/{safe(d.get('title') or ref, 80)}"
                 time.sleep(1)
                 if _download(s, f"https://www.kaggle.com/api/v1/datasets/download/{ref}", cap, sink,
                              f"{dest}/{safe(ref.replace('/', ' - '), 100)}.zip"):
