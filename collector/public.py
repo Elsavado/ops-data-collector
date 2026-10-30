@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import time
 
 from docx import Document
@@ -43,6 +44,12 @@ SEARCHES = {
     BIZ: ["security services contracts", "facility management costs", "IT spending",
           "technician wages", "occupational employment security"],
 }
+
+
+def title_query(q):
+    """Search term that must appear in the title (Zenodo and CKAN both take Lucene syntax)."""
+    words = [w for w in q.split() if w.lower() not in ("dataset", "data", "logs")] or q.split()
+    return "title:(" + " AND ".join(words) + ")"
 
 
 def meta_note(sink, folder, info):
@@ -356,7 +363,7 @@ def zenodo(sink, st, per_query=6, cap=2 * 2 ** 30):
             page = pages.get(q, 1)
             time.sleep(2.5)
             r = get(s, "https://zenodo.org/api/records", params={
-                "q": q, "size": 25, "page": page, "sort": "mostviewed", "access_status": "open"})
+                "q": title_query(q), "size": 25, "page": page, "sort": "mostviewed", "access_status": "open"})
             hits = r.json().get("hits", {}).get("hits", []) if r else []
             pages[q] = page + 1 if hits else 1
             took = 0
@@ -390,52 +397,78 @@ def zenodo(sink, st, per_query=6, cap=2 * 2 ** 30):
     return n
 
 
-def datagov(sink, st, per_query=5, cap=1 * 2 ** 30):
+# Searches suited to government open-data portals; every word must be in the dataset name.
+PORTAL_SEARCHES = {
+    TI: ["cybersecurity", "cyber incidents", "data breach"],
+    STD: ["information security", "data breach notifications", "privacy"],
+    ITSM: ["311 service requests", "work orders", "IT assets", "help desk", "service requests", "IT tickets",
+           "fleet maintenance", "facility maintenance", "asset inventory"],
+    PHYS: ["calls for service", "crime incidents", "fire incidents", "burglary", "security cameras", "alarm",
+           "camera", "surveillance", "access control", "security incidents", "dispatch"],
+    HOSP: ["hotel", "lodging", "short term rental", "cruise", "port", "tourism", "visitor", "vessel", "marina"],
+    CLOUD: ["network outages", "data center", "broadband", "IT spending", "outages", "internet"],
+    BIZ: ["security services", "payroll", "vendor payments", "contracts", "procurement", "employee salaries",
+          "expenditures", "purchase orders"],
+}
+STOP = {"for", "of", "and", "the", "it"}
+
+
+def _open_portal(lic):
+    lic = (lic or "").lower()
+    if not lic:
+        return True  # government portals without a stated licence publish public records
+    if "noncommercial" in lic or "non-commercial" in lic or "no derivatives" in lic:
+        return False
+    return any(x in lic for x in ("public domain", "creative commons", "open data commons", "odc", "open government",
+                                  "cc0", "attribution", "open database"))
+
+
+def opendata(sink, st, per_query=5, cap=1 * 2 ** 30):
+    """US city / state / federal open-data portals through the Socrata Discovery API (CSV exports)."""
     s = session()
-    seen = st.setdefault("datagov_seen", [])
+    seen = st.setdefault("socrata_seen", [])
     seen_set = set(seen)
-    offs = st.setdefault("datagov_start", {})
+    offs = st.setdefault("socrata_offset", {})
     n = 0
-    for folder, qs in SEARCHES.items():
+    for folder, qs in PORTAL_SEARCHES.items():
         for q in qs:
             if sink.full():
                 return n
-            start = offs.get(q, 0)
+            off = offs.get(q, 0)
             time.sleep(1)
-            r = get(s, "https://catalog.data.gov/api/3/action/package_search",
-                    params={"q": q, "rows": 20, "start": start})
-            res = r.json().get("result", {}).get("results", []) if r else []
-            offs[q] = start + 20 if res else 0
+            r = get(s, "https://api.us.socrata.com/api/catalog/v1",
+                    params={"q": q, "only": "dataset", "limit": 20, "offset": off, "order": "relevance"})
+            res = r.json().get("results", []) if r else []
+            offs[q] = off + 20 if res else 0
+            want = [w for w in q.lower().split() if w not in STOP] or q.lower().split()
             took = 0
-            for p in res:
+            for x in res:
                 if took >= per_query or sink.full():
                     break
-                if p["id"] in seen_set or not _open(p.get("license_id") or "public"):
+                rs, md = x["resource"], x["metadata"]
+                key = f"{md['domain']}/{rs['id']}"
+                name = rs.get("name") or rs["id"]
+                if key in seen_set or not _open_portal(md.get("license")):
                     continue
-                seen.append(p["id"])
-                seen_set.add(p["id"])
-                res_ok = [x for x in p.get("resources", [])
-                          if (x.get("format") or "").lower().strip(".") in KEEP_EXT and x.get("url")]
-                if not res_ok:
+                words = set(re.findall(r"[a-z0-9]+", name.lower()))
+                if not all(w in words or w + "s" in words for w in want):
                     continue
-                dest = f"{folder}/data.gov/{safe(p.get('title', p['name']), 90)}"
-                got = 0
-                for x in res_ok[:6]:
-                    ext = (x.get("format") or "dat").lower().strip(".")
-                    nm = safe(x.get("name") or p["name"], 80)
-                    if not nm.lower().endswith("." + ext):
-                        nm += "." + ext
-                    if _download(s, x["url"], cap, sink, f"{dest}/{nm}"):
-                        got += 1
-                if got:
-                    meta_note(sink, dest, {"source": "data.gov", "dataset": f"https://catalog.data.gov/dataset/{p['name']}",
-                                           "publisher": (p.get("organization") or {}).get("title"),
-                                           "license": p.get("license_title"), "search": q,
-                                           "description": (p.get("notes") or "")[:4000]})
+                seen.append(key)
+                seen_set.add(key)
+                dest = f"{folder}/Open Data Portals/{safe(name, 80)} ({md['domain']})"
+                url = f"https://{md['domain']}/api/views/{rs['id']}/rows.csv?accessType=DOWNLOAD"
+                if _download(s, url, cap, sink, f"{dest}/{safe(name, 80)}.csv"):
+                    meta_note(sink, dest, {"source": "Socrata open-data portal", "portal": md["domain"],
+                                           "dataset": x.get("permalink") or x.get("link"),
+                                           "publisher": (x.get("classification") or {}).get("domain_category"),
+                                           "license": md.get("license") or "not stated (government open data)",
+                                           "updated": rs.get("data_updated_at"), "search": q,
+                                           "columns": rs.get("columns_name", [])[:200],
+                                           "description": (rs.get("description") or "")[:4000]})
                     took += 1
                     n += 1
     return n
 
 
 SOURCES = {"kev": kev, "nvd": nvd, "attack": attack, "nist": nist, "fixed": fixed,
-           "zenodo": zenodo, "datagov": datagov}
+           "zenodo": zenodo, "opendata": opendata}

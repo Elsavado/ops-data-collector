@@ -2,8 +2,8 @@ name: rclone setup
 description: Install rclone, write its config, pull run state from Drive and work out the size budget
 inputs:
   conf:
-    description: rclone.conf contents with a [pax] Google Drive remote
-    required: true
+    description: rclone.conf contents with a [pax] Google Drive remote (empty = dry run only)
+    required: false
 runs:
   using: composite
   steps:
@@ -13,6 +13,11 @@ runs:
       run: |
         curl -fsSL https://rclone.org/install.sh | sudo bash >/dev/null
         mkdir -p ~/.config/rclone state
+        if [ -z "$RCLONE_CONF" ]; then
+          echo "No RCLONE_CONF secret: dry run with a 3 GB budget"
+          echo 3 > budget.txt
+          exit 0
+        fi
         printf '%s\n' "$RCLONE_CONF" > ~/.config/rclone/rclone.conf
         chmod 600 ~/.config/rclone/rclone.conf
         rclone copy "$REMOTE/_state" state -q || true

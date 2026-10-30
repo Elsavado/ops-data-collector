@@ -10,13 +10,13 @@ marinas and residential/retail clients. Files go straight from the runner to Goo
 
 | Folder | Sources |
 |---|---|
-| 1 Threat Intelligence | CISA KEV, NVD CVE records per month, MITRE ATT&CK, Zenodo / data.gov datasets |
+| 1 Threat Intelligence | CISA KEV, NVD CVE records per month, MITRE ATT&CK, Zenodo and government open-data portal (Socrata) datasets |
 | 2 Standards & Compliance | NIST SP 800-53 Rev 5 (XLSX + DOCX per family), datasets |
 | 3 IT Service Management | UCI ITSM incident event log, datasets |
-| 4 Physical Security & Surveillance | datasets |
+| 4 Physical Security & Surveillance | Zenodo + open-data portal datasets |
 | 5 Hospitality & Maritime Operations | Hotel booking demand, datasets |
-| 6 Cloud & Infrastructure Operations | datasets |
-| 7 Workforce & Business Benchmarks | datasets |
+| 6 Cloud & Infrastructure Operations | Zenodo + open-data portal datasets |
+| 7 Workforce & Business Benchmarks | Zenodo + open-data portal datasets |
 | 8 Books & Knowledge Library | NIST security publications, open-access books (OpenAlex, CC/public domain), Wikipedia topic articles as DOCX, OWASP, CWE, CAPEC, D3FEND, Sigma, Atomic Red Team |
 
 **Fictional Company - Harborlight Secure Systems** (synthetic, made-up names, `.example` domains):
