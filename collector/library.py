@@ -3,6 +3,7 @@ import datetime as dt
 import html
 import re
 import time
+from urllib.parse import quote
 
 from docx import Document
 from docx.shared import Pt
@@ -219,4 +220,93 @@ def knowledge(sink, st):
     return n
 
 
-SOURCES = {"nistpubs": nist_pubs, "books": open_books, "wikipedia": wikipedia, "knowledge": knowledge}
+VIDEOS = f"{LIB.rsplit('/', 1)[0]}/10 Videos & Talks"
+# folder: searches (all words must appear in the item's title, subjects or description)
+VIDEO_SEARCHES = {
+    "Security Operations & SOC": ["security operations center", "soc analyst", "threat hunting",
+                                  "network security monitoring", "flow analysis", "siem", "security operations"],
+    "Incident Response & Forensics": ["incident response", "digital forensics", "malware analysis", "ransomware"],
+    "Security Conferences": ["shmoocon", "bsides", "derbycon", "defcon", "hackers on planet earth", "chaos communication"],
+    "Video Surveillance & Physical Security": ["cctv", "video surveillance", "surveillance camera", "access control",
+                                               "physical security", "lock picking", "alarm system"],
+    "IT Operations & Service Management": ["help desk", "itil", "it service management", "system administration",
+                                           "sysadmin", "it operations", "service desk", "it support"],
+    "Cloud, DevOps & SRE": ["devops", "site reliability", "kubernetes", "cloud computing", "docker", "linux administration",
+                            "network engineering"],
+    "Business of IT & Security Services": ["managed services", "security industry", "cybersecurity business",
+                                           "it consulting", "outsourcing", "webinar security", "zoom webinar it",
+                                           "business continuity"],
+    "Hospitality & Maritime Security": ["hotel security", "cruise ship", "maritime security", "port security",
+                                        "hospitality technology"],
+}
+VIDEO_OPEN = ("creativecommons.org", "publicdomain")
+STOP = {"of", "and", "the", "it", "on"}
+
+
+def videos(sink, st, per_query=3, item_cap=4 * 2 ** 30):
+    """Openly licensed talks, webinars and recordings from the Internet Archive: smallest MP4 + subtitles."""
+    s = session()
+    seen = st.setdefault("video_seen", [])
+    seen_set = set(seen)
+    pages = st.setdefault("video_page", {})
+    n = 0
+    for folder, qs in VIDEO_SEARCHES.items():
+        for q in qs:
+            if sink.full():
+                return n
+            page = pages.get(q, 1)
+            time.sleep(1)
+            r = get(s, "https://archive.org/advancedsearch.php", params={
+                "q": f'("{q}") AND mediatype:movies', "fl[]": ["identifier", "title", "licenseurl", "subject",
+                                                              "description"],
+                "rows": 50, "page": page, "output": "json", "sort[]": "downloads desc"})
+            docs = r.json().get("response", {}).get("docs", []) if r else []
+            pages[q] = page + 1 if docs else 1
+            want = [w for w in q.lower().split() if w not in STOP]
+            took = 0
+            for doc in docs:
+                if took >= per_query or sink.full():
+                    break
+                ident, lic = doc["identifier"], doc.get("licenseurl") or ""
+                if ident in seen_set or not any(x in lic for x in VIDEO_OPEN):
+                    continue
+                subj = doc.get("subject") or ""
+                text = " ".join([str(doc.get("title", "")), " ".join(subj) if isinstance(subj, list) else str(subj),
+                                 str(doc.get("description", ""))[:3000]]).lower()
+                if not all(w in text for w in want):
+                    continue
+                seen.append(ident)
+                seen_set.add(ident)
+                md = get(s, f"https://archive.org/metadata/{ident}")
+                files = md.json().get("files", []) if md else []
+                vids = {}
+                for f in files:  # smallest MP4 per original video
+                    nm = f.get("name", "")
+                    if nm.lower().endswith(".mp4") and f.get("size"):
+                        stem = nm.rsplit(".", 1)[0].replace(".ia", "").rsplit("_512kb", 1)[0]
+                        if stem not in vids or int(f["size"]) < int(vids[stem]["size"]):
+                            vids[stem] = f
+                subs = [f for f in files if f.get("name", "").lower().endswith((".srt", ".vtt"))]
+                if not vids:
+                    continue
+                dest = f"{VIDEOS}/{folder}/{safe(doc.get('title') or ident, 90)}"
+                total, got = 0, 0
+                for f in sorted(vids.values(), key=lambda f: f["name"])[:25]:
+                    total += int(f["size"])
+                    if total > item_cap or sink.full():
+                        break
+                    if _download(s, f"https://archive.org/download/{ident}/{quote(f['name'])}", 2 * 2 ** 30, sink,
+                                 f"{dest}/{f['name'].rsplit('/', 1)[-1]}"):
+                        got += 1
+                for f in subs[:25]:
+                    _download(s, f"https://archive.org/download/{ident}/{quote(f['name'])}", 50 * 2 ** 20, sink,
+                              f"{dest}/{f['name'].rsplit('/', 1)[-1]}")
+                if got:
+                    meta_note(sink, dest, {"source": "Internet Archive", "item": f"https://archive.org/details/{ident}",
+                                           "title": doc.get("title"), "license": lic, "search": q})
+                    took += 1
+                    n += 1
+    return n
+
+
+SOURCES = {"nistpubs": nist_pubs, "videos": videos, "books": open_books, "wikipedia": wikipedia, "knowledge": knowledge}

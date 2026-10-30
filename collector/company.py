@@ -9,6 +9,7 @@ import gzip
 import io
 import math
 import random
+import sys
 import zipfile
 from email.message import EmailMessage
 from email.utils import format_datetime
@@ -22,6 +23,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from . import names as N
+from . import staff_records as S
 from .common import add_sheet, new_book, safe, save_book
 
 CO = "Harborlight Secure Systems"
@@ -49,7 +51,7 @@ ACCOUNTS = {
     "5500": ("Vehicles", "Expense"), "5600": ("Software licences", "Expense"),
     "5700": ("Insurance", "Expense"), "5800": ("Depreciation", "Expense"),
     "5900": ("Bad debts", "Expense"), "6000": ("Training, uniforms & PPE", "Expense"),
-    "6100": ("Professional fees", "Expense")}
+    "6100": ("Professional fees", "Expense"), "6200": ("Staff travel & expense claims", "Expense")}
 
 # role: (department, monthly base USD, required-headcount rule on (cameras, sites, clients))
 ROLES = {
@@ -375,6 +377,7 @@ class Month:
             self.by_site.setdefault(a["site"], []).append(a)
         self.gl = []
         self.emails = []
+        self.C, self.F, self.BANNER = sys.modules[__name__], F, BANNER
 
     def ts(self, day=None, hour=None):
         r = self.rng
@@ -417,8 +420,12 @@ class Month:
         self.crm()
         self.hr()
         self.finance()
+        S.collect(self)
+        if self.ym[1] == 12:
+            S.person_year(self.w, self.L, self.ym[0], self.sink, self.C, final=True)
         self.reports()
         self.meetings()
+        S.meetings_av(self)
         self.write_mail()
         if self.detail > 0:
             self.telemetry()
@@ -715,6 +722,7 @@ class Month:
         pay, ts = [], []
         ops = {"SOC Analyst", "SOC Shift Lead", "Field Technician"}
         self.payroll_total = self.eos_total = 0.0
+        self.pay_lines = {}
         for e in self.staff:
             base = self.w.pay(e, self.ym)
             house, trans = r2(base * .25), r2(base * .08)
@@ -727,6 +735,7 @@ class Month:
             eos = r2(base * 21 / 365 * 12 / 12)
             self.payroll_total += gross
             self.eos_total += eos
+            self.pay_lines[e["id"]] = (base, house, trans, ot, otp, gross, eos, leave)
             pay.append([e["id"], e["name"], e["dept"], e["role"], base, house, trans, otp, gross, 0.0, gross, eos,
                         f"AE{r.randrange(10 ** 18):018d}"[:23]])
             ts.append([e["id"], e["name"], e["role"], reg, ot, leave, int(shifts) if shifts else "", self.tag])
@@ -749,6 +758,11 @@ class Month:
         moves = [[e["id"], e["name"], e["role"], "Joined", self.tag, ""] for e in self.w.staff if e["hired"] == self.ym]
         moves += [[e["id"], e["name"], e["role"], "Left", self.tag, e["leave_reason"]]
                   for e in self.w.staff if e["left"] == self.ym]
+        for e in self.w.staff:
+            if e["hired"] == self.ym:
+                S.joiner_docs(self, e)
+            elif e["left"] == self.ym:
+                S.leaver_docs(self, e)
         if moves:
             wb = new_book()
             add_sheet(wb, "Movements", ["Employee", "Name", "Role", "Movement", "Month", "Reason"], moves,
@@ -758,6 +772,7 @@ class Month:
     def finance(self):
         r, L = self.rng, self.L
         eom = self.d0 + dt.timedelta(days=self.days - 1)
+        S.expenses(self)
         if self.ym == START:
             self.post(self.d0, "OPEN", "Share capital paid in", [("1000", 2500000, 0), ("3000", 0, 2500000)])
         invoices = []
@@ -1341,6 +1356,7 @@ def static_docs(w, sink):
                            "Take part in incident reviews"], 4):
             bullet(d, x)
         save_doc(sink, f"{F['hr']}/Job descriptions/{role}.docx", d)
+    S.it_sops(w, sink, sys.modules[__name__])
     d = new_doc(f"{CO} - dataset README", BANNER)
     d.add_paragraph("This folder holds a synthetic but internally consistent set of operating records for a "
                     "fictional managed security and IT services company. Invoices tie to the general ledger, "
@@ -1361,8 +1377,17 @@ def static_docs(w, sink):
         ["07 Assets & Inventory", "Asset register (as of …).xlsx", "Every device ever installed"],
         ["08 Finance & Accounting", "YYYY/General ledger, Trial balance, Invoices (PDF), AR aging, Bank statements, "
                                     "Budget, Financial statements", "Double-entry books"],
+        ["08 Finance & Accounting", "YYYY/Expense claims/Expense claims YYYY-MM.xlsx", "Staff expense claims (in GL 6200)"],
         ["09 HR & Workforce", "Employee roster, YYYY/Payroll register, Timesheets, SOC shift roster, Joiners and leavers, "
                               "Job descriptions", "People records (fictional)"],
+        ["09 HR & Workforce", "Employee Files/<id name>/01 Contract & Onboarding, 02 Pay, 03 Performance, 04 Training, "
+                              "05 Expenses, 06 Work Log, 07 Exit", "One file per person: offer, contract, IT onboarding, "
+                              "pay statement, review, training, expenses, own alarms/tickets/work orders, exit"],
+        ["11 Policies & SOPs", "IT SOPs/*.docx", "Step-by-step IT procedures (onboarding, patching, backups, P1 bridge…)"],
+        ["12 Emails & Meetings", "YYYY/Zoom Meetings/<date title>/ (.vtt transcript, chat .txt, participants .csv)",
+         "Weekly operations meetings, quarterly client service reviews"],
+        ["12 Emails & Meetings", "YYYY/Google Meet/<date title>/ (transcript .docx, attendance .csv)",
+         "P1 incident bridges, change advisory board"],
         ["10 Management Reports", "YYYY/Client service reports, KPI dashboards, Board packs", "Monthly and quarterly"],
         ["11 Policies & SOPs", "*.docx", "Policies and procedures"],
         ["12 Emails & Meetings", "YYYY/Email exports/*.zip (.eml), Meeting minutes/*.docx", "Correspondence"],
@@ -1397,5 +1422,8 @@ def build(sink, st, max_months=24, scale=1.0, detail=1.0):
         n += 1
         ym = ym_add(ym, 1)
     if n:
-        snapshots(w, tuple(st["done"]), sink)
+        last = tuple(st["done"])
+        snapshots(w, last, sink)
+        if last[1] != 12:  # employee files for the current year so far (rewritten in place next run)
+            S.person_year(w, ledger, last[0], sink, sys.modules[__name__], final=False)
     return n
