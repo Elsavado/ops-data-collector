@@ -18,6 +18,9 @@ marinas and residential/retail clients. Files go straight from the runner to Goo
 | 6 Cloud & Infrastructure Operations | Loghub system logs (16 systems, 5.6 GB), Zenodo + open-data portal datasets |
 | 7 Workforce & Business Benchmarks | Zenodo + open-data portal datasets |
 | 9 IT & Developer Tools | product release/end-of-life dates (endoflife.date), Stack Exchange archives (Server Fault, Super User, Security, Ask Ubuntu, Unix, DBA, DevOps…), Kubernetes/Docker/Ansible/Prometheus/Windows Server/PowerShell/PostgreSQL docs, Pro Git, tldr, curated tool catalogues, IT documentation & runbooks (GitHub topic it-documentation, Microsoft Engineering Playbook, Gruntwork Runbooks, onboarding templates), companies by technology stack (Leadita), Kaggle datasets |
+| 11 GitHub Repositories | licensed technical repos by topic (SOC/SIEM, incident response, pentesting, CCTV/NVR, access control, ITSM, asset management, monitoring, networking, DevOps, IoT, hospitality) |
+| 12 Jupyter Notebooks | .ipynb notebooks from licensed repos (intrusion/anomaly detection, malware & phishing, log analysis/AIOps, threat hunting, CCTV analytics, predictive maintenance, cloud, hospitality, fraud) |
+| 13 Software & Apps | latest releases of open-source apps used by security & IT service firms (Windows/Linux x64 installers + source) |
 | 10 Videos & Talks | openly licensed talks, webinars, conference recordings and documentaries (Internet Archive), MP4 + subtitles, by topic (SOC, incident response, surveillance, IT operations, DevOps/SRE, business of IT services, hospitality & maritime) |
 | 8 Books & Knowledge Library | NIST security publications, open-access books (OpenAlex, CC/public domain), Wikipedia topic articles as DOCX, OWASP, CWE, CAPEC, D3FEND, Sigma, Atomic Red Team |
 

@@ -7,10 +7,10 @@ import os
 import time
 import traceback
 
-from . import company, kaggle, library, public, techdocs
+from . import company, github, kaggle, library, public, techdocs
 from .common import Sink, State
 
-EXTRA = {**library.SOURCES, **techdocs.SOURCES, **kaggle.SOURCES}
+EXTRA = {**library.SOURCES, **techdocs.SOURCES, **kaggle.SOURCES, **github.SOURCES}
 ALL = list(public.SOURCES) + list(EXTRA) + ["company"]
 
 
