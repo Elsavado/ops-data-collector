@@ -69,6 +69,7 @@ class Sink:
         self.out, self.remote, self.live, self.state, self.keep = out, remote, live, state, keep
         self.budget = budget_bytes
         self.deadline = deadline
+        self.slice_end = deadline  # per-source time slice, set by the runner
         self.sent_bytes = 0
         self.files = 0
         self.pending = 0
@@ -96,7 +97,7 @@ class Sink:
         self.write_bytes(rel, text.encode("utf-8"))
 
     def full(self):
-        return self.sent_bytes + self.pending >= self.budget or time.time() > self.deadline
+        return self.sent_bytes + self.pending >= self.budget or time.time() > min(self.deadline, self.slice_end)
 
     def flush(self):
         if self.keep and not self.live:

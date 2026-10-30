@@ -35,7 +35,10 @@ def main():
     if "company" in srcs:  # long-running sources last so fixed ones always get a turn
         srcs = [x for x in srcs if x != "company"] + ["company"]
     failed = []
-    for name in srcs:
+    for i, name in enumerate(srcs):
+        # fair share of the time left: no single source can starve the ones after it
+        left = sink.deadline - time.time()
+        sink.slice_end = time.time() + max(15 * 60, left / (len(srcs) - i))
         if sink.full():
             print(f"{name}: skipped (time or size budget reached)")
             continue
