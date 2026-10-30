@@ -7,10 +7,11 @@ import os
 import time
 import traceback
 
-from . import company, library, public
+from . import company, kaggle, library, public, techdocs
 from .common import Sink, State
 
-ALL = list(public.SOURCES) + list(library.SOURCES) + ["company"]
+EXTRA = {**library.SOURCES, **techdocs.SOURCES, **kaggle.SOURCES}
+ALL = list(public.SOURCES) + list(EXTRA) + ["company"]
 
 
 def main():
@@ -47,8 +48,8 @@ def main():
                 unit = "months"
             elif name == "nvd":
                 n, unit = public.nvd(sink, st.section("public"), a.nvd_months), "CVEs"
-            elif name in library.SOURCES:
-                n, unit = library.SOURCES[name](sink, st.section("public")), "items"
+            elif name in EXTRA:
+                n, unit = EXTRA[name](sink, st.section("public")), "items"
             else:
                 n, unit = public.SOURCES[name](sink, st.section("public")), "items"
             sink.flush()

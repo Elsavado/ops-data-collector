@@ -15,8 +15,9 @@ marinas and residential/retail clients. Files go straight from the runner to Goo
 | 3 IT Service Management | UCI ITSM incident event log, datasets |
 | 4 Physical Security & Surveillance | Zenodo + open-data portal datasets |
 | 5 Hospitality & Maritime Operations | Hotel booking demand, datasets |
-| 6 Cloud & Infrastructure Operations | Zenodo + open-data portal datasets |
+| 6 Cloud & Infrastructure Operations | Loghub system logs (16 systems, 5.6 GB), Zenodo + open-data portal datasets |
 | 7 Workforce & Business Benchmarks | Zenodo + open-data portal datasets |
+| 9 IT & Developer Tools | product release/end-of-life dates (endoflife.date), Stack Exchange archives (Server Fault, Super User, Security, Ask Ubuntu, Unix, DBA, DevOps…), Kubernetes/Docker/Ansible/Prometheus/Windows Server/PowerShell/PostgreSQL docs, Pro Git, tldr, curated tool catalogues, Kaggle datasets |
 | 8 Books & Knowledge Library | NIST security publications, open-access books (OpenAlex, CC/public domain), Wikipedia topic articles as DOCX, OWASP, CWE, CAPEC, D3FEND, Sigma, Atomic Red Team |
 
 **Fictional Company - Harborlight Secure Systems** (synthetic, made-up names, `.example` domains):
@@ -29,6 +30,7 @@ History runs from 2016-01 and is extended month by month; reruns reproduce past 
 ## Running
 
 - Secret `RCLONE_CONF`: an rclone.conf with a Google Drive remote named `[pax]`.
+- Optional secrets `KAGGLE_USERNAME`, `KAGGLE_KEY` (kaggle.com → Settings → API → Create New Token) for Kaggle datasets in every topic folder.
 - Variable `LIVE=true` turns on uploads; without it every run is a dry run.
 - Schedule: every 6 hours; manual runs via *Actions → collect → Run workflow*.
 - State lives on Drive in `_state/`, so runs resume where the last one stopped.

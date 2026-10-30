@@ -45,6 +45,12 @@ WIKI_CATS = {
                                "Network video recorders", "Power over Ethernet", "Internet of things"],
     "Hospitality & Maritime": ["Hospitality management", "Hotel terminology", "Cruise ships", "Maritime security",
                                "Ports and harbours", "Tourism"],
+    "IT & Developer Tools": ["Software development tools", "Version control systems", "Continuous integration",
+                             "Configuration management", "Integrated development environments", "Linux distributions",
+                             "Operating systems", "Database management systems", "Virtualization software",
+                             "Containerization software", "Network protocols", "Web servers", "Programming languages",
+                             "Monitoring software", "Remote administration software", "Backup software",
+                             "Identity management", "Firewall software", "Software testing", "DevOps"],
     "Business & Risk": ["Risk management", "Business continuity", "Service-level agreements",
                         "Outsourcing", "Facility management", "Security companies", "Privacy law"],
 }
