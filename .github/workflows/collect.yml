@@ -25,6 +25,9 @@ on:
       detail:
         description: "telemetry density"
         default: "1"
+      minutes:
+        description: "time budget per job (minutes)"
+        default: "320"
       dry_run:
         description: "force a dry run (no upload)"
         type: boolean
@@ -60,7 +63,7 @@ jobs:
         run: |
           budget=$(cat budget.txt)
           flag=$([ "$LIVE" = "true" ] && echo --live || echo "")
-          python -m collector --sources "$SOURCES" --state state/public.json --budget-gb "$budget" --minutes 320 $flag
+          python -m collector --sources "$SOURCES" --state state/public.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 320 }}" $flag
 
   company:
     if: github.event_name == 'schedule' || inputs.company
@@ -83,6 +86,6 @@ jobs:
         run: |
           budget=$(cat budget.txt)
           flag=$([ "$LIVE" = "true" ] && echo --live || echo "--months 2")
-          python -m collector --sources company --state state/company.json --budget-gb "$budget" --minutes 320 \
+          python -m collector --sources company --state state/company.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 320 }}" \
             --months "${{ inputs.months || '40' }}" --scale "${{ inputs.scale || '3' }}" \
             --detail "${{ inputs.detail || '1' }}" $flag
