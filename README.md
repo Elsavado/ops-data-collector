@@ -30,7 +30,7 @@ History runs from 2016-01 and is extended month by month; reruns reproduce past 
 ## Running
 
 - Secret `RCLONE_CONF`: an rclone.conf with a Google Drive remote named `[pax]`.
-- Optional secrets `KAGGLE_USERNAME`, `KAGGLE_KEY` (kaggle.com → Settings → API → Create New Token) for Kaggle datasets in every topic folder.
+- Optional secret `KAGGLE_API_TOKEN` (kaggle.com → Settings → API → Create New Token) for Kaggle datasets in every topic folder.
 - Variable `LIVE=true` turns on uploads; without it every run is a dry run.
 - Schedule: every 6 hours; manual runs via *Actions → collect → Run workflow*.
 - State lives on Drive in `_state/`, so runs resume where the last one stopped.

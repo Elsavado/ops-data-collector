@@ -53,6 +53,7 @@ jobs:
       - name: Collect
         env:
           LIVE: ${{ vars.LIVE == 'true' && inputs.dry_run != true }}
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
           SOURCES: ${{ inputs.public_sources || 'kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,eol,techdocs,wikipedia,books,stackexchange,kaggle,zenodo,opendata' }}

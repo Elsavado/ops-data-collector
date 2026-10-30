@@ -1,4 +1,5 @@
-"""Kaggle datasets with open licences. Listing is anonymous; downloads need KAGGLE_USERNAME / KAGGLE_KEY."""
+"""Kaggle datasets with open licences. Listing is anonymous; downloads need KAGGLE_API_TOKEN
+(or the older KAGGLE_USERNAME / KAGGLE_KEY pair)."""
 import os
 import time
 
@@ -37,12 +38,16 @@ def _ok(lic):
 
 
 def kaggle(sink, st, per_query=3, cap=3 * 2 ** 30):
+    token = os.environ.get("KAGGLE_API_TOKEN")
     user, key = os.environ.get("KAGGLE_USERNAME"), os.environ.get("KAGGLE_KEY")
-    if not (user and key):
-        print("kaggle: KAGGLE_USERNAME / KAGGLE_KEY not set, skipped")
+    if not (token or (user and key)):
+        print("kaggle: no Kaggle credentials, skipped")
         return 0
     s = session()
-    s.auth = (user, key)
+    if token:
+        s.headers["Authorization"] = f"Bearer {token}"
+    else:
+        s.auth = (user, key)
     seen = st.setdefault("kaggle_seen", [])
     seen_set = set(seen)
     pages = st.setdefault("kaggle_page", {})
