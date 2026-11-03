@@ -1,6 +1,7 @@
 name: collect
 
-# Runs every 6 hours. Each job collects into the runner and moves files to Google Drive with rclone
+# Endless loop: when a run ends, its "next" job starts the following one (CHAIN=off stops it);
+# the 6-hourly schedule only restarts the chain if nothing is running. Each job collects into the runner and moves files to Google Drive with rclone
 # as it goes. Uploads happen only when repo variable LIVE is "true"; otherwise it is a dry run.
 # This repository is public: logs print counts only.
 
@@ -38,8 +39,28 @@ env:
   PYTHONUNBUFFERED: "1"
 
 jobs:
+  gate:
+    # the 6-hourly schedule is only a watchdog: it starts nothing while a chained run is active
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    outputs:
+      go: ${{ steps.g.outputs.go }}
+    steps:
+      - id: g
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          go=true
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            n=$(gh run list -R "${{ github.repository }}" --workflow collect.yml --json databaseId,status                 -q '[.[] | select(.databaseId != ${{ github.run_id }} and (.status == "in_progress" or .status == "queued"))] | length')
+            [ "$n" -gt 0 ] && go=false
+          fi
+          echo "go=$go" >> "$GITHUB_OUTPUT"; echo "go=$go"
+
   public:
-    if: github.event_name == 'schedule' || inputs.public_sources != ''
+    needs: gate
+    if: needs.gate.outputs.go == 'true' && (github.event_name == 'schedule' || inputs.public_sources != '')
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
@@ -97,7 +118,8 @@ jobs:
           [ -f $f ] && rclone copyto $f "$R/_state/public-${{ matrix.group }}.json" -q || true
 
   company:
-    if: github.event_name == 'schedule' || inputs.company
+    needs: gate
+    if: needs.gate.outputs.go == 'true' && (github.event_name == 'schedule' || inputs.company)
     runs-on: ubuntu-latest
     timeout-minutes: 350
     concurrency: company
@@ -130,3 +152,16 @@ jobs:
             rclone move out "$R" --transfers 4 --drive-chunk-size 64M --retries 5 --delete-empty-src-dirs -q || true
           fi
           [ -f state/company.json ] && rclone copyto state/company.json "$R/_state/company.json" -q || true
+
+  next:
+    # endless hand-off: when this run ends, start the next one (repo variable CHAIN=off stops the loop)
+    needs: [gate, public, company]
+    if: always() && needs.gate.outputs.go == 'true' && vars.LIVE == 'true' && vars.CHAIN != 'off'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Start the next run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run collect.yml -R "${{ github.repository }}"
