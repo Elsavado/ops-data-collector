@@ -42,7 +42,22 @@ jobs:
     if: github.event_name == 'schedule' || inputs.public_sources != ''
     runs-on: ubuntu-latest
     timeout-minutes: 350
-    concurrency: public
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # slow multi-GB sources each get their own runner so they can't hold up the rest
+          - group: zenodo
+            sources: zenodo
+          - group: kaggle
+            sources: kaggle
+          - group: library
+            sources: wikipedia,books,videos,nistpubs,knowledge
+          - group: tech
+            sources: records,cicids2018,itdocs,eol,techdocs,stackexchange,ghrepos,notebooks,apps
+          - group: feeds
+            sources: kev,nvd,attack,nist,fixed,opendata
+    concurrency: public-${{ matrix.group }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -61,11 +76,15 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-          SOURCES: ${{ inputs.public_sources || 'kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,cicids2018,itdocs,eol,techdocs,wikipedia,books,videos,stackexchange,kaggle,ghrepos,notebooks,apps,zenodo,opendata' }}
+          STATE_SEED: state/public.json
+          ALLOWED: ${{ inputs.public_sources || 'kev,nvd,attack,nist,fixed,knowledge,nistpubs,records,cicids2018,itdocs,eol,techdocs,wikipedia,books,videos,stackexchange,kaggle,ghrepos,notebooks,apps,zenodo,opendata' }}
         run: |
+          # keep only this group's sources that the dispatch asked for
+          SOURCES=$(python3 -c "import os;a=set(os.environ['ALLOWED'].split(','));print(','.join(x for x in '${{ matrix.sources }}'.split(',') if x in a))")
+          if [ -z "$SOURCES" ]; then echo "nothing to do for this group"; exit 0; fi
           budget=$(cat budget.txt)
           flag=$([ "$LIVE" = "true" ] && echo --live || echo "")
-          python -m collector --sources "$SOURCES" --state state/public.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 300 }}" $flag
+          python -m collector --sources "$SOURCES" --state state/public-${{ matrix.group }}.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 300 }}" $flag
 
       - name: Ship leftovers
         if: always() && vars.LIVE == 'true' && inputs.dry_run != true
@@ -74,7 +93,8 @@ jobs:
           if [ -d out ] && [ -n "$(ls -A out 2>/dev/null)" ]; then
             rclone move out "$R" --transfers 4 --drive-chunk-size 64M --retries 5 --delete-empty-src-dirs -q || true
           fi
-          [ -f state/public.json ] && rclone copyto state/public.json "$R/_state/public.json" -q || true
+          f=state/public-${{ matrix.group }}.json
+          [ -f $f ] && rclone copyto $f "$R/_state/public-${{ matrix.group }}.json" -q || true
 
   company:
     if: github.event_name == 'schedule' || inputs.company

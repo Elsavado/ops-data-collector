@@ -46,8 +46,10 @@ class State:
     def __init__(self, path):
         self.path = path
         self.data = {}
-        if os.path.exists(path):
-            with open(path, encoding="utf-8") as f:
+        seed = os.environ.get("STATE_SEED")  # a new parallel group starts from the shared progress file
+        src = path if os.path.exists(path) else (seed if seed and os.path.exists(seed) else None)
+        if src:
+            with open(src, encoding="utf-8") as f:
                 self.data = json.load(f)
 
     def section(self, key):
