@@ -382,13 +382,19 @@ def _download(s, url, cap, sink, rel):
             if r.status_code != 200 or int(r.headers.get("Content-Length") or 0) > cap:
                 return False
             n = 0
+            # hard stop: a slow multi-GB stream must not run past the job's time budget
+            stop_at = min(sink.deadline, sink.slice_end + 20 * 60)
+            late = False
             with open(p, "wb") as f:
                 for chunk in r.iter_content(1 << 20):
                     n += len(chunk)
                     if n > cap:
                         break
+                    if time.time() > stop_at:
+                        late = True
+                        break
                     f.write(chunk)
-        if n > cap or n == 0:
+        if n > cap or n == 0 or late:
             os.remove(p)
             return False
         sink.wrote(p)

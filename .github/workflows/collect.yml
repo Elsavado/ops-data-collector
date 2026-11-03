@@ -54,6 +54,7 @@ jobs:
         with:
           conf: ${{ secrets.RCLONE_CONF }}
       - name: Collect
+        timeout-minutes: 320
         env:
           LIVE: ${{ vars.LIVE == 'true' && inputs.dry_run != true }}
           KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
@@ -64,7 +65,16 @@ jobs:
         run: |
           budget=$(cat budget.txt)
           flag=$([ "$LIVE" = "true" ] && echo --live || echo "")
-          python -m collector --sources "$SOURCES" --state state/public.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 320 }}" $flag
+          python -m collector --sources "$SOURCES" --state state/public.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 300 }}" $flag
+
+      - name: Ship leftovers
+        if: always() && vars.LIVE == 'true' && inputs.dry_run != true
+        run: |
+          R="${REMOTE:-pax:Security & IT Operations Research}"
+          if [ -d out ] && [ -n "$(ls -A out 2>/dev/null)" ]; then
+            rclone move out "$R" --transfers 4 --drive-chunk-size 64M --retries 5 --delete-empty-src-dirs -q || true
+          fi
+          [ -f state/public.json ] && rclone copyto state/public.json "$R/_state/public.json" -q || true
 
   company:
     if: github.event_name == 'schedule' || inputs.company
@@ -82,11 +92,21 @@ jobs:
         with:
           conf: ${{ secrets.RCLONE_CONF }}
       - name: Build fictional company
+        timeout-minutes: 320
         env:
           LIVE: ${{ vars.LIVE == 'true' && inputs.dry_run != true }}
         run: |
           budget=$(cat budget.txt)
           flag=$([ "$LIVE" = "true" ] && echo --live || echo "--months 2")
-          python -m collector --sources company --state state/company.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 320 }}" \
+          python -m collector --sources company --state state/company.json --budget-gb "$budget" --minutes "${{ inputs.minutes || 300 }}" \
             --months "${{ inputs.months || '40' }}" --scale "${{ inputs.scale || '3' }}" \
             --detail "${{ inputs.detail || '1' }}" $flag
+
+      - name: Ship leftovers
+        if: always() && vars.LIVE == 'true' && inputs.dry_run != true
+        run: |
+          R="${REMOTE:-pax:Security & IT Operations Research}"
+          if [ -d out ] && [ -n "$(ls -A out 2>/dev/null)" ]; then
+            rclone move out "$R" --transfers 4 --drive-chunk-size 64M --retries 5 --delete-empty-src-dirs -q || true
+          fi
+          [ -f state/company.json ] && rclone copyto state/company.json "$R/_state/company.json" -q || true
